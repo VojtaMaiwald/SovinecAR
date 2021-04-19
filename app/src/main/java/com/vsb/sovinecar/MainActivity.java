@@ -1,6 +1,7 @@
 package com.vsb.sovinecar;
 
 import android.app.ActionBar;
+import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -46,6 +47,7 @@ import com.google.ar.sceneform.Node;
 import com.google.ar.sceneform.Scene;
 import com.google.ar.sceneform.Sceneform;
 import com.google.ar.sceneform.math.Quaternion;
+import com.google.ar.sceneform.math.QuaternionEvaluator;
 import com.google.ar.sceneform.math.Vector3;
 import com.google.ar.sceneform.rendering.EngineInstance;
 import com.google.ar.sceneform.rendering.ExternalTexture;
@@ -95,6 +97,7 @@ public class MainActivity extends AppCompatActivity implements
         super.onCreate(savedInstanceState);
 
         getSupportActionBar().hide();
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         setContentView(R.layout.activity_main);
 
@@ -114,7 +117,7 @@ public class MainActivity extends AppCompatActivity implements
             }
         }
 
-        modelList = new LinkedList<Model>();
+        modelList = new LinkedList<>();
         modelList.add(new Model(ModelName.FOX, ModelUri.FOX, findViewById(R.id.foxView)));
         modelList.add(new Model(ModelName.IRONMAN, ModelUri.IRONMAN, findViewById(R.id.ironmanView)));
         modelList.add(new Model(ModelName.MERCEDES, ModelUri.MERCEDES, findViewById(R.id.mercedesView)));
@@ -211,7 +214,7 @@ public class MainActivity extends AppCompatActivity implements
 
             Config config = new Config(session);
             if (!buildDatabase(config)) {
-                Toast.makeText(this, "Database error", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Chyba při načítání databáze", Toast.LENGTH_SHORT).show();
             }
             config.setUpdateMode(Config.UpdateMode.LATEST_CAMERA_IMAGE);
             session.configure(config);
@@ -257,22 +260,61 @@ public class MainActivity extends AppCompatActivity implements
                 if (image.getTrackingState() == TrackingState.TRACKING) {
                     if (image.getName().equals("rabbit.png")) {
                         Log.println(Log.ASSERT, "lol", "Rabbit detected");
+                        findViewById(R.id.tagSquare).setVisibility(View.GONE);
+                        isDetected = true;
+                        Toast.makeText(this, "Model se načítá...", Toast.LENGTH_LONG).show();
+
                         ArNode arNode = new ArNode(this, ModelUri.RABBIT);
                         arNode.setImage(image, true);
                         this.arFragment.getArSceneView().getScene().addChild(arNode);
-                        isDetected = true;
+
+                        switchMode(false);
                     }
-                    /*
                     else if (image.getName().equals("key.png")) {
-                        ArNode arNode = new ArNode(this, ModelUri.FOX);
-                        arNode.setImage(image);
-                        this.arFragment.getArSceneView().getScene().addChild(arNode);
+                        Log.println(Log.ASSERT, "lol", "Key detected");
+                        findViewById(R.id.tagSquare).setVisibility(View.GONE);
                         isDetected = true;
+                        Toast.makeText(this, "Model se načítá...", Toast.LENGTH_LONG).show();
+
+                        WeakReference<MainActivity> weakActivity = new WeakReference<>(this);
+                        ModelRenderable.builder()
+                                .setSource(this, Uri.parse(ModelUri.KEY))
+                                .setIsFilamentGltf(true)
+                                .build()
+                                .thenAccept(model -> {
+                                    MainActivity activity = weakActivity.get();
+                                    if (activity != null) {
+
+                                        model.setShadowCaster(false);
+                                        model.setShadowReceiver(false);
+
+                                        AnchorNode anchorNode = new AnchorNode(image.createAnchor(image.getCenterPose()));
+                                        anchorNode.setSmoothed(false);
+                                        this.arFragment.getArSceneView().getScene().addChild(anchorNode);
+
+                                        TransformableNode transNode = new TransformableNode(arFragment.getTransformationSystem());
+                                        transNode.setParent(anchorNode);
+                                        transNode.setRenderable(model);
+                                        transNode.setLocalPosition(new Vector3(0, -1f , 1f));
+                                        transNode.setLocalRotation(Quaternion.multiply(
+                                                new Quaternion(new Vector3(1f, 0, 0), 270f),
+                                                new Quaternion(new Vector3(0, 1f, 0), 180f)
+                                        ));
+                                        transNode.getRenderableInstance().animate(true).start();
+
+                                        switchMode(false);
+                                    }
+                                })
+                                .exceptionally(throwable -> {
+                                    Toast.makeText(this, "Nelze načíst model " + ModelUri.VAULT, Toast.LENGTH_LONG).show();
+                                    return null;
+                                });
                     }
-                    */
                     else if (image.getName().equals("vault.png")) {
                         Log.println(Log.ASSERT, "lol", "Vault detected");
+                        findViewById(R.id.tagSquare).setVisibility(View.GONE);
                         isDetected = true;
+                        Toast.makeText(this, "Model se načítá...", Toast.LENGTH_LONG).show();
 
                         WeakReference<MainActivity> weakActivity = new WeakReference<>(this);
                         ModelRenderable.builder()
@@ -295,6 +337,8 @@ public class MainActivity extends AppCompatActivity implements
                                     transNode.setParent(arNode);
                                     transNode.setRenderable(model);
                                     transNode.getRenderableInstance().animate(true).start();
+
+                                    switchMode(false);
                                 }
                             })
                             .exceptionally(throwable -> {
@@ -306,7 +350,9 @@ public class MainActivity extends AppCompatActivity implements
 
                     else if (image.getName().equals("matrix.png")) {
                         Log.println(Log.ASSERT, "lol", "Matrix detected");
+                        findViewById(R.id.tagSquare).setVisibility(View.GONE);
                         isDetected = true;
+                        Toast.makeText(this, "Model se načítá...", Toast.LENGTH_LONG).show();
 
                         WeakReference<MainActivity> weakActivity = new WeakReference<>(this);
                         ModelRenderable.builder()
@@ -325,24 +371,26 @@ public class MainActivity extends AppCompatActivity implements
                                     arNode.setWorldScale(new Vector3(image.getExtentX(), 1f, image.getExtentZ()));
                                     this.arFragment.getArSceneView().getScene().addChild(arNode);
 
-                                    // Create the transformable model and add it to the anchor.
                                     TransformableNode transNode = new TransformableNode(arFragment.getTransformationSystem());
                                     transNode.setParent(arNode);
                                     transNode.setLocalRotation(Quaternion.axisAngle(new Vector3(0, 1f, 0), 180f));
-                                    //transNode.getRenderableInstance().animate(true).start();
 
                                     ExternalTexture externalTexture = new ExternalTexture();
-                                    //MediaPlayer mediaPlayer;
                                     RenderableInstance renderableInstance;
                                     transNode.setRenderable(plainVideoModel);
                                     renderableInstance = transNode.getRenderableInstance();
                                     renderableInstance.setMaterial(plainVideoMaterial);
-                                    mediaPlayer = MediaPlayer.create(this, R.raw.matrix);
+
 
                                     renderableInstance.getMaterial().setExternalTexture("videoTexture", externalTexture);
+                                    mediaPlayer = MediaPlayer.create(this, R.raw.matrix);
                                     mediaPlayer.setLooping(true);
                                     mediaPlayer.setSurface(externalTexture.getSurface());
                                     mediaPlayer.start();
+
+                                    Toast.makeText(this, "Přehrávání videa bude přidáno", Toast.LENGTH_LONG).show();
+
+                                    switchMode(false);
                                 }
                             })
                             .exceptionally(throwable -> {
@@ -381,7 +429,9 @@ public class MainActivity extends AppCompatActivity implements
                 MainActivity activity = weakActivity.get();
                 if (activity != null) {
                     modelInstance.setRenderable(model);
-                    if (modelInstance.getName() == ModelName.FOX) {
+                    model.setShadowCaster(false);
+                    model.setShadowReceiver(false);
+                    if (modelInstance.getName().equals(ModelName.FOX)) {
                         activity.activeModel = modelInstance;
                         modelInstance.getImageView().setBackgroundColor(Color.parseColor("#99000000"));
                     }
@@ -405,6 +455,7 @@ public class MainActivity extends AppCompatActivity implements
         Anchor anchor = hitResult.createAnchor();
         AnchorNode anchorNode = new AnchorNode(anchor);
         anchorNode.setParent(arFragment.getArSceneView().getScene());
+        anchorNode.setSmoothed(false);
 
         // Create the transformable model and add it to the anchor.
         TransformableNode transNode = new TransformableNode(arFragment.getTransformationSystem());
@@ -428,12 +479,14 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     public void onFabClearBtnClick(View view) {
-        List<Node> children = new ArrayList<>(arFragment.getArSceneView().getScene().getChildren());
-        for (Node node : children) {
-            if (node instanceof AnchorNode) {
-                if (((AnchorNode) node).getAnchor() != null) {
-                    ((AnchorNode) node).getAnchor().detach();
+        List<Node> children = arFragment.getArSceneView().getScene().getChildren();
+        //for (Node node : children) {
+        for (int i = 0; i < children.size(); i++) {
+            if (children.get(i) instanceof AnchorNode) {
+                if (((AnchorNode) children.get(i)).getAnchor() != null) {
+                    ((AnchorNode) children.get(i)).getAnchor().detach();
                 }
+                arFragment.getArSceneView().getScene().removeChild(children.get(i));
             }
         }
         isDetected = false;
@@ -446,15 +499,17 @@ public class MainActivity extends AppCompatActivity implements
 
         if (toTagMode) {
             findViewById(R.id.scrollView).setVisibility(View.GONE);
+            findViewById(R.id.tagSquare).setVisibility(View.VISIBLE);
             ((FloatingActionButton)findViewById(R.id.switchButton)).setImageResource(R.drawable.round_view_in_ar_24);
             this.activeModel = null;
         }
         else {
             findViewById(R.id.scrollView).setVisibility(View.VISIBLE);
+            findViewById(R.id.tagSquare).setVisibility(View.GONE);
             ((FloatingActionButton)findViewById(R.id.switchButton)).setImageResource(R.drawable.round_qr_code_scanner_24);
             this.activeModel = this.modelList.get(0);
             for (Model model : modelList) {
-                if (model.getName() == ModelName.FOX)
+                if (model.getName().equals(ModelName.FOX))
                     model.getImageView().setBackgroundColor(Color.parseColor("#99000000"));
                 else
                     model.getImageView().setBackgroundColor(Color.parseColor("#00000000"));

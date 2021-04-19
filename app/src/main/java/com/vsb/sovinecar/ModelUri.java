@@ -9,6 +9,7 @@ public final class ModelUri {
     public static final String MATRIX = "Video.glb";
     public static final String RABBIT = "Rabbit.glb";
     public static final String VAULT = "Vault.glb";
+    public static final String KEY = "export - kopie.glb";
 
     private ModelUri() { }
 }

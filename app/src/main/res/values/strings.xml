@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">SovinecAR</string>
+    <string name="tagText">Pohybem telefonu zaplňte vymezený prostor AR tagem</string>
 </resources>
