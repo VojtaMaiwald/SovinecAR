@@ -1,32 +1,21 @@
 package com.vsb.sovinecar;
 
-import android.app.ActionBar;
 import android.content.pm.ActivityInfo;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.Window;
-import android.view.WindowManager;
-import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
-import androidx.core.view.ViewCompat;
 
 
 import com.google.android.filament.Engine;
 import com.google.android.filament.filamat.MaterialBuilder;
 import com.google.android.filament.filamat.MaterialPackage;
-import com.google.android.filament.Engine;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.ar.core.Anchor;
 import com.google.ar.core.AugmentedImage;
@@ -35,19 +24,15 @@ import com.google.ar.core.Config;
 import com.google.ar.core.Frame;
 import com.google.ar.core.HitResult;
 import com.google.ar.core.Plane;
-import com.google.ar.core.Pose;
 import com.google.ar.core.Session;
 import com.google.ar.core.TrackingState;
 import com.google.ar.core.exceptions.CameraNotAvailableException;
 import com.google.ar.sceneform.AnchorNode;
-import com.google.ar.sceneform.Camera;
 import com.google.ar.sceneform.FrameTime;
-import com.google.ar.sceneform.HitTestResult;
 import com.google.ar.sceneform.Node;
 import com.google.ar.sceneform.Scene;
 import com.google.ar.sceneform.Sceneform;
 import com.google.ar.sceneform.math.Quaternion;
-import com.google.ar.sceneform.math.QuaternionEvaluator;
 import com.google.ar.sceneform.math.Vector3;
 import com.google.ar.sceneform.rendering.EngineInstance;
 import com.google.ar.sceneform.rendering.ExternalTexture;
@@ -55,7 +40,6 @@ import com.google.ar.sceneform.rendering.Material;
 import com.google.ar.sceneform.rendering.ModelRenderable;
 import com.google.ar.sceneform.rendering.Renderable;
 import com.google.ar.sceneform.rendering.RenderableInstance;
-import com.google.ar.sceneform.rendering.ViewRenderable;
 import com.google.ar.sceneform.ux.ArFragment;
 import com.google.ar.sceneform.ux.BaseArFragment;
 import com.google.ar.sceneform.ux.TransformableNode;
@@ -64,11 +48,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.jar.Attributes;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity implements
         BaseArFragment.OnTapArPlaneListener,
@@ -83,7 +67,7 @@ public class MainActivity extends AppCompatActivity implements
     private boolean inTagMode = false;
 
     private Scene scene;
-    private boolean isDetected = false;
+    Map<String, Boolean> tagsDetected = new HashMap();
 
     private boolean configureSession = false;
     private Session session;
@@ -248,20 +232,41 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    public void onUpdate(FrameTime frameTime) {
-        if (!inTagMode || isDetected)
-            return;
+    private boolean anyUntrackedTagExists() {
+        if (tagsDetected.isEmpty()){
 
+            tagsDetected.put("rabbit.png", false);
+            tagsDetected.put("key.png", false);
+            tagsDetected.put("vault.png", false);
+            tagsDetected.put("matrix.png", false);
+
+            return true;
+        }
+
+        for (String name : tagsDetected.keySet()) {
+            if (tagsDetected.get(name))
+                return true;
+        }
+        return false;
+    }
+
+    public void onUpdate(FrameTime frameTime) {
+        if (!inTagMode || !anyUntrackedTagExists())
+            return;
         Frame frame = this.arFragment.getArSceneView().getArFrame();
         try {
             Collection<AugmentedImage> augmentedImageCollection = frame.getUpdatedTrackables(AugmentedImage.class);
 
             for (AugmentedImage image : augmentedImageCollection) {
                 if (image.getTrackingState() == TrackingState.TRACKING) {
-                    if (image.getName().equals("rabbit.png")) {
+                    Log.println(Log.ASSERT, "lol", "TRACKING");
+
+                    String imageName = image.getName();
+
+                    if (!tagsDetected.get(imageName) && imageName.equals("rabbit.png")) {
+                        tagsDetected.replace(imageName, true);
                         Log.println(Log.ASSERT, "lol", "Rabbit detected");
                         findViewById(R.id.tagSquare).setVisibility(View.GONE);
-                        isDetected = true;
                         Toast.makeText(this, "Model se načítá...", Toast.LENGTH_LONG).show();
 
                         ArNode arNode = new ArNode(this, ModelUri.RABBIT);
@@ -270,10 +275,10 @@ public class MainActivity extends AppCompatActivity implements
 
                         switchMode(false);
                     }
-                    else if (image.getName().equals("key.png")) {
+                    else if (!tagsDetected.get(imageName) && imageName.equals("key.png")) {
+                        tagsDetected.replace(imageName, true);
                         Log.println(Log.ASSERT, "lol", "Key detected");
                         findViewById(R.id.tagSquare).setVisibility(View.GONE);
-                        isDetected = true;
                         Toast.makeText(this, "Model se načítá...", Toast.LENGTH_LONG).show();
 
                         WeakReference<MainActivity> weakActivity = new WeakReference<>(this);
@@ -310,10 +315,10 @@ public class MainActivity extends AppCompatActivity implements
                                     return null;
                                 });
                     }
-                    else if (image.getName().equals("vault.png")) {
+                    else if (!tagsDetected.get(imageName) && imageName.equals("vault.png")) {
+                        tagsDetected.replace(imageName, true);
                         Log.println(Log.ASSERT, "lol", "Vault detected");
                         findViewById(R.id.tagSquare).setVisibility(View.GONE);
-                        isDetected = true;
                         Toast.makeText(this, "Model se načítá...", Toast.LENGTH_LONG).show();
 
                         WeakReference<MainActivity> weakActivity = new WeakReference<>(this);
@@ -347,11 +352,10 @@ public class MainActivity extends AppCompatActivity implements
                             });
                     }
 
-
-                    else if (image.getName().equals("matrix.png")) {
+                    else if (!tagsDetected.get(imageName) && imageName.equals("matrix.png")) {
+                        tagsDetected.replace(imageName, true);
                         Log.println(Log.ASSERT, "lol", "Matrix detected");
                         findViewById(R.id.tagSquare).setVisibility(View.GONE);
-                        isDetected = true;
                         Toast.makeText(this, "Model se načítá...", Toast.LENGTH_LONG).show();
 
                         WeakReference<MainActivity> weakActivity = new WeakReference<>(this);
@@ -489,7 +493,9 @@ public class MainActivity extends AppCompatActivity implements
                 arFragment.getArSceneView().getScene().removeChild(children.get(i));
             }
         }
-        isDetected = false;
+
+        tagsDetected.clear();
+
         if (mediaPlayer != null)
             mediaPlayer.stop();
     }
@@ -502,6 +508,7 @@ public class MainActivity extends AppCompatActivity implements
             findViewById(R.id.tagSquare).setVisibility(View.VISIBLE);
             ((FloatingActionButton)findViewById(R.id.switchButton)).setImageResource(R.drawable.round_view_in_ar_24);
             this.activeModel = null;
+            arFragment.getArSceneView().getPlaneRenderer().setVisible(false);
         }
         else {
             findViewById(R.id.scrollView).setVisibility(View.VISIBLE);
@@ -514,6 +521,7 @@ public class MainActivity extends AppCompatActivity implements
                 else
                     model.getImageView().setBackgroundColor(Color.parseColor("#00000000"));
             }
+            arFragment.getArSceneView().getPlaneRenderer().setVisible(true);
         }
     }
 
